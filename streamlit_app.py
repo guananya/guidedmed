@@ -45,7 +45,7 @@ def process_script(script):
         return final_file.name
 
 # Streamlit UI
-st.title("Guided Meditation Script Generator")
+st.title("🧿 Guided Meditation Script Generator")
 
 api_key = st.text_input("Enter OpenAI API Key", type="password")
 prompt = st.text_area("Enter your prompt")
