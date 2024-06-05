@@ -1,21 +1,20 @@
 import streamlit as st
 import openai
-from openai import OpenAI
-from pathlib import Path
 from pydub import AudioSegment
 import re
+import tempfile
+import os
 
 # Function to generate speech
 def generate_speech(text, voice="onyx", model="tts-1"):
-    # Assuming your API client setup is correct and functional
-    speech_file_path = Path("/Users/ananyagupta/Downloads/audios") / "temp.mp3"
-    response = client.audio.speech.create(
-        model=model,
-        voice=voice,
-        input=text
-    )
-    response.stream_to_file(speech_file_path)
-    return AudioSegment.from_mp3(speech_file_path)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as speech_file:
+        response = client.audio.speech.create(
+            model=model,
+            voice=voice,
+            input=text
+        )
+        response.stream_to_file(speech_file.name)
+        return AudioSegment.from_mp3(speech_file.name)
 
 # Function to generate silence
 def generate_silence(duration):
@@ -41,8 +40,9 @@ def process_script(script):
         else:
             combined += generate_speech(part.strip())
 
-    final_path = Path("/Users/ananyagupta/Downloads/audios") / "final_meditation.mp3"
-    combined.export(final_path, format="mp3")
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as final_file:
+        combined.export(final_file.name, format="mp3")
+        return final_file.name
 
 # Streamlit UI
 st.title("Guided Meditation Script Generator")
@@ -52,7 +52,8 @@ prompt = st.text_area("Enter your prompt")
 
 if st.button("Generate Audio"):
     if api_key and prompt:
-        client = OpenAI(api_key=api_key)
+        openai.api_key = api_key
+        client = openai
 
         completion = client.chat.completions.create(
           model="gpt-3.5-turbo",
@@ -66,10 +67,13 @@ if st.button("Generate Audio"):
         script = completion.choices[0].message.content
         st.text_area("Generated Script", script, height=200)
 
-        process_script(script)
+        audio_path = process_script(script)
         st.success("Audio generated successfully!")
-        audio_file = Path("/Users/ananyagupta/Downloads/audios") / "final_meditation.mp3"
-        audio_bytes = audio_file.read_bytes()
-        st.audio(audio_bytes, format='audio/mp3')
+
+        with open(audio_path, 'rb') as audio_file:
+            audio_bytes = audio_file.read()
+            st.audio(audio_bytes, format='audio/mp3')
+
+        os.remove(audio_path)  # Clean up temporary file after use
     else:
         st.error("Please enter both the API key and a prompt.")
